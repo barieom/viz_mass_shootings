@@ -1,8 +1,8 @@
 # Visualizing Mass Shootings
-===
+---
 By Barry Eom, Dan Cetlin, Brian Djerf
 
-===
+---
 ## Goal:
 Our goal is to visualize the trends of mass shootings in the United States ranging from 1982 to 2018
 
