@@ -16,8 +16,9 @@
 
 	// set the dimensions and margins of the graph
 	var margin = {top: 20, right: 20, bottom: 30, left: 40},
-	    width = 960 - margin.left - margin.right,
-	    height = 500 - margin.top - margin.bottom;
+	    width = 1500 - margin.left - margin.right,
+	    height = 800 - margin.top - margin.bottom,
+		padding = 25;
 
 	// set the ranges
 	var x = d3.scaleBand()
@@ -34,44 +35,85 @@
 	var svg = d3.select("body").append("svg")
 	    .attr("width", width + margin.left + margin.right)
 	    .attr("height", height + margin.top + margin.bottom)
-	  .append("g")
-	    .attr("transform", 
-	          "translate(" + margin.left + "," + margin.top + ")");
+		.append("g")
+		.attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+	//   .append("g")
+	//     .attr("transform", 
+	//           "translate(" + margin.left + "," + margin.top + ")");
+
+	function filterIncident(data) {
+		let fatalities = []
+		let injuries = []
+		let res = []
+		data.forEach(function(element) {
+			fatalities.push(element["fatalities"])
+			injuries.push(element["injured"])
+		});
+		res[0] = fatalities
+		res[1] = injuries
+		return res
+	}
+
 
 	d3.queue()
 	  .defer(d3.csv, "/assets/data/mass_shootings.csv")
 	  .await(ready);
 
+	const MAX_DOMAIN = 100
+
 	function ready(error, data) {
 		if (error) { console.log(error); }
 
-		console.log(data[100])
-		yearly = getYearlyVictims(data)
+		var yScale = d3.scaleLinear()
+		.domain([0, MAX_DOMAIN])//d3.max(data, d => { return Number(d.total_victims); })])
+		.range([height, 0]);
+		
+		var parseTime = d3.timeParse("%m/%d/%Y");
+		var parseYear = d3.timeParse("%Y");
 
-		// Scale the range of the data in the domains
-		// x.domain(data.map(function(d) { return d.salesperson; }));
-		// y.domain([0, d3.max(data, function(d) { return d.sales; })]);
-	  
+		var xScale = d3.scaleTime()
+		.domain([parseYear("2002"), parseYear("2008")])
+		.range([0, width]);
 
-		// arbitrary bar graph for reference
-		// var dataset = [80, 100, 56, 120, 180, 30, 40, 120, 160];
-		// var barPadding = 5;
-		// var barWidth = (svgWidth / dataset.length);
-		// var barChart = svg.selectAll("rect")
-		//     .data(dataset)
-		//     .enter()
-		//     .append("rect")
-		//     .attr("y", function(d) {
-		//         return svgHeight - d
-		//     })
-		//     .attr("height", function(d) {
-		//         return d;
-		//     })
-		//     .attr("width", barWidth - barPadding)
-		//     .attr("transform", function (d, i) {
-		//          var translate = [barWidth * i, 0];
-		//          return "translate("+ translate +")";
-		// });
+		var yAxis = d3.axisLeft(yScale)
+		.ticks(10)
+		.tickSize(5, 0, 0)
+		.tickFormat(d => {return d})
+
+		var xAxis = d3.axisBottom(xScale)
+		.tickFormat(d3.timeFormat("%Y"))
+		.ticks(20)
+
+		var groups = svg.selectAll("g")
+			.data(data).enter()
+			.append("g")
+			.attr("id", (d, i) => {return "g_" + i});
+		
+		groups
+			.append("rect")
+			.attr("x", (d) => {return xScale(parseTime(d.date))})
+			.attr("y", (d) => {return yScale(d.total_victims)})
+			.attr("width", 5)
+			.attr("height", (d) => {return height - yScale(d.total_victims)})
+			.style("fill", "black")
+		
+		groups
+			.append("rect")
+			.attr("x", (d) => {return xScale(parseTime(d.date))})
+			.attr("y", (d) => {return yScale(d.fatalities)})
+			.attr("width", 5)
+			.attr("height", (d) => {return height - yScale(d.fatalities)})
+			.style("fill", "red")
+		
+		svg.append("g")
+			.attr("class", "y_axis")
+			.call(yAxis);
+
+		svg.append("g")
+			.attr("class", "x_axis")
+			.attr("transform", "translate(0," + height + ")")
+			.call(xAxis);
+
 	}
 
 	function getYearlyVictims(data) {
