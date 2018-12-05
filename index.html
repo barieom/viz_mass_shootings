@@ -18,7 +18,8 @@
 	var margin = {top: 20, right: 20, bottom: 30, left: 40},
 	    width = 1500 - margin.left - margin.right,
 	    height = 800 - margin.top - margin.bottom,
-		padding = 25;
+		padding = 25,
+		GROUP_SEPARATION_RATE = 2;
 
 	// set the ranges
 	var x = d3.scaleBand()
@@ -64,6 +65,12 @@
 	function ready(error, data) {
 		if (error) { console.log(error); }
 
+		let years_to_idx = getYearToIdx(data)
+		const numYears = Object.keys(years_to_idx).length
+		console.log(years_to_idx)
+		console.log(numYears)
+		
+		/* SCALES */
 		var yScale = d3.scaleLinear()
 		.domain([0, MAX_DOMAIN])//d3.max(data, d => { return Number(d.total_victims); })])
 		.range([height, 0]);
@@ -71,27 +78,44 @@
 		var parseTime = d3.timeParse("%m/%d/%Y");
 		var parseYear = d3.timeParse("%Y");
 
-		var xScale = d3.scaleTime()
-		.domain([parseYear("2002"), parseYear("2008")])
-		.range([0, width]);
+		var xTimeScale = d3.scaleTime()
+			.domain([parseYear("1982"), parseYear("2019")])
+			.range([0, width])
 
+		var xDistributedScale = d3.scaleLinear()
+			.domain([0, data.length + (numYears)*GROUP_SEPARATION_RATE])
+			.range([0, width])
+
+		/* AXES */
 		var yAxis = d3.axisLeft(yScale)
-		.ticks(10)
-		.tickSize(5, 0, 0)
-		.tickFormat(d => {return d})
+			.ticks(10)
+			.tickSize(5, 0, 0)
+			.tickFormat(d => {return d})
 
-		var xAxis = d3.axisBottom(xScale)
-		.tickFormat(d3.timeFormat("%Y"))
-		.ticks(20)
+		var xAxis = d3.axisBottom(xTimeScale)
+			.tickFormat(d3.timeFormat("%m-%Y"))
+			.ticks(20)
 
+		let distributed_domain_values = Object.keys(years_to_idx).map(year => {
+			let d = years_to_idx[year];
+			return d.first_bar_idx + d.num/2.0 + d.idx * GROUP_SEPARATION_RATE
+		})
+		var xDistributedAxis = d3.axisBottom(xDistributedScale)
+			.tickValues(distributed_domain_values)
+			.tickFormat((d, i) => {return Object.keys(years_to_idx)[i]})
+
+		/* SVG APPENDAGES */
 		var groups = svg.selectAll("g")
 			.data(data).enter()
 			.append("g")
+			.attr("class", "bar")
 			.attr("id", (d, i) => {return "g_" + i});
 		
 		groups
 			.append("rect")
-			.attr("x", (d) => {return xScale(parseTime(d.date))})
+			.attr("class", "blackbars")
+			.attr("id", (d, i) => {return "black_" + i})
+			.attr("x", (d, i) => {return xTimeScale(parseTime(d.date))})
 			.attr("y", (d) => {return yScale(d.total_victims)})
 			.attr("width", 5)
 			.attr("height", (d) => {return height - yScale(d.total_victims)})
@@ -99,7 +123,9 @@
 		
 		groups
 			.append("rect")
-			.attr("x", (d) => {return xScale(parseTime(d.date))})
+			.attr("class", "redbars")
+			.attr("id", (d, i) => {return "red_" + i})
+			.attr("x", (d, i) => {return xTimeScale(parseTime(d.date))})
 			.attr("y", (d) => {return yScale(d.fatalities)})
 			.attr("width", 5)
 			.attr("height", (d) => {return height - yScale(d.fatalities)})
@@ -112,8 +138,79 @@
 		svg.append("g")
 			.attr("class", "x_axis")
 			.attr("transform", "translate(0," + height + ")")
-			.call(xAxis);
+			.call(xAxis)
+			.selectAll("text")	
+			.style("text-anchor", "end")
+			.attr("dx", "-.8em")
+			.attr("dy", ".15em")
+			.attr("transform", "rotate(-65)");
+		
+		var zoom = d3.zoom().on('zoom', () => {
+			let new_xScale = d3.event.transform.rescaleX(xScale);
+			console.log(xScale(50))
+			console.log(new_xScale)
+		});
 
+		/* VIEW CONVERSION FUNCTIONS */
+		let convertToDistributed = () => {
+			d3.selectAll(".blackbars")
+				.transition()
+				.duration(600)
+				.attr('x', (d, i) => {
+					return xDistributedScale(i + years_to_idx[d.year].idx * GROUP_SEPARATION_RATE);
+				})
+				.attr('width', 8)
+			d3.selectAll(".redbars")
+				.transition()
+				.duration(600)
+				.attr('x', (d, i) => {
+					return xDistributedScale(i + years_to_idx[d.year].idx * GROUP_SEPARATION_RATE);
+				})
+				.attr('width', 8)
+			
+			d3.select(".x_axis").call(xDistributedAxis)
+				.selectAll("text")	
+				.style("text-anchor", "end")
+				.attr("dx", "-.8em")
+				.attr("dy", ".15em")
+				.attr("transform", "rotate(-65)");
+		}
+
+		let convertToYearly = () => {
+			d3.selectAll(".blackbars")
+				.transition()
+				.duration(600)
+				.attr('x', (d, i) => {return xTimeScale(parseTime(d.date))})
+				.attr('width', 5)
+			d3.selectAll(".redbars")
+				.transition()
+				.duration(600)
+				.attr('x', (d, i) => {return xTimeScale(parseTime(d.date))})
+				.attr('width', 5)
+
+			d3.select(".x_axis").call(xAxis)
+				.selectAll("text")	
+				.style("text-anchor", "end")
+				.attr("dx", "-.8em")
+				.attr("dy", ".15em")
+				.attr("transform", "rotate(-65)");
+		}
+
+		svg.append("rect")
+			.attr("x", 100)
+			.attr("y", 100)
+			.attr("width", 50)
+			.attr("height", 50)
+			.style("fill", "blue")
+			.on("click", convertToDistributed);
+
+		svg.append("rect")
+			.attr("x", 160)
+			.attr("y", 100)
+			.attr("width", 50)
+			.attr("height", 50)
+			.style("fill", "green")
+			.on("click", convertToYearly);
 	}
 
 	function getYearlyVictims(data) {
@@ -126,9 +223,29 @@
 				yearlyVictims[year] = Number(element["total_victims"])
 			}
 		})
-		console.log(yearlyVictims)
 		return yearlyVictims
 	}
+
+		function getYearToIdx(data) {
+			let yearlyVictims = {}
+			let counter = 0
+			let num_element = 0
+			data.reverse().forEach(function(element) {
+				let year = (new Date(element["date"])).getFullYear()
+				if (!(year in yearlyVictims)) {
+					yearlyVictims[year] = {
+						idx: counter++,
+						num: 1,
+						first_bar_idx: num_element,
+						year: year
+					};
+				} else {
+					yearlyVictims[year].num++;
+				}
+				num_element++;
+			})
+			return yearlyVictims
+		}
 
 	</script>
 
