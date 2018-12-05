@@ -15,7 +15,7 @@
 	<script>
 
 	// set the dimensions and margins of the graph
-	var margin = {top: 20, right: 20, bottom: 30, left: 40},
+	var margin = {top: 20, right: 20, bottom: 80, left: 40},
 	    width = 1500 - margin.left - margin.right,
 	    height = 800 - margin.top - margin.bottom,
 		padding = 25,
@@ -27,20 +27,13 @@
 	          .padding(0.1);
 	var y = d3.scaleLinear()
 	          .range([height, 0]);
-
-	// https://bl.ocks.org/d3noob/bdf28027e0ce70bd132edc64f1dd7ea4
-	          
-	// append the svg object to the body of the page
-	// append a 'group' element to 'svg'
-	// moves the 'group' element to the top left margin
+	
 	var svg = d3.select("body").append("svg")
 	    .attr("width", width + margin.left + margin.right)
 	    .attr("height", height + margin.top + margin.bottom)
-		.append("g")
+	
+	var group = svg.append("g")
 		.attr("transform", "translate(" + margin.left + "," + margin.top + ")")
-	//   .append("g")
-	//     .attr("transform", 
-	//           "translate(" + margin.left + "," + margin.top + ")");
 
 	function filterIncident(data) {
 		let fatalities = []
@@ -61,25 +54,24 @@
 	  .await(ready);
 
 	const MAX_DOMAIN = 100
+	const AXIS_TEXT_DY = ".80em"
 
 	function ready(error, data) {
 		if (error) { console.log(error); }
+		let STATE = "default";
+
 
 		let years_to_idx = getYearToIdx(data)
 		const numYears = Object.keys(years_to_idx).length
-		console.log(years_to_idx)
-		console.log(numYears)
-		
 		/* SCALES */
 		var yScale = d3.scaleLinear()
-		.domain([0, MAX_DOMAIN])//d3.max(data, d => { return Number(d.total_victims); })])
+		.domain([0, MAX_DOMAIN])// d3.max(data, d => { return Number(d.total_victims); })])
 		.range([height, 0]);
 		
-		var parseTime = d3.timeParse("%m/%d/%Y");
-		var parseYear = d3.timeParse("%Y");
-
+		var parseTime = d3.timeParse("%m/%d/%Y"), parseYear = d3.timeParse("%Y");
+		var yearRange = [parseYear("1982"), parseYear("2019")]
 		var xTimeScale = d3.scaleTime()
-			.domain([parseYear("1982"), parseYear("2019")])
+			.domain(yearRange)
 			.range([0, width])
 
 		var xDistributedScale = d3.scaleLinear()
@@ -93,19 +85,49 @@
 			.tickFormat(d => {return d})
 
 		var xAxis = d3.axisBottom(xTimeScale)
-			.tickFormat(d3.timeFormat("%m-%Y"))
 			.ticks(20)
 
 		let distributed_domain_values = Object.keys(years_to_idx).map(year => {
 			let d = years_to_idx[year];
 			return d.first_bar_idx + d.num/2.0 + d.idx * GROUP_SEPARATION_RATE
-		})
+		});
 		var xDistributedAxis = d3.axisBottom(xDistributedScale)
 			.tickValues(distributed_domain_values)
 			.tickFormat((d, i) => {return Object.keys(years_to_idx)[i]})
+		
+		var zoom = d3.zoom()
+			.scaleExtent([1, 15])
+			.translateExtent([[0, 0], [width, height]])
+			.extent([[0, 0], [width, height]])
+			.on("zoom", zoomed);
+	
+		// function zoomed() {
+		// 	var t = d3.event.transform;
+		// 	xTimeScale.domain(t.rescaleX(xTimeScale).domain());
+		// 	d3.select(".x_axis").call(xAxis);
+		// }
+		function zoomed() {
+			if (STATE != "default") return;
+			let new_xScale = d3.event.transform.rescaleX(xTimeScale).range([0, width]);
+			
+			group.select(".x_axis").transition()
+				.duration(20)
+				.call(xAxis.scale(new_xScale))
+				.selectAll("text")	
+				.style("text-anchor", "end")
+				.attr("dx", "-.8em")
+				.attr("dy", AXIS_TEXT_DY)
+				.attr("transform", "rotate(-65)");		
+			
+			group.selectAll("rect").transition()
+				.duration(20)
+				.attr("x", (d, i) => {let newx = new_xScale(parseTime(d.date)); return newx >= 0? newx <= width? newx: width+10000: -10000})
+		}
+
+		svg.call(zoom);
 
 		/* SVG APPENDAGES */
-		var groups = svg.selectAll("g")
+		var groups = group.selectAll("g")
 			.data(data).enter()
 			.append("g")
 			.attr("class", "bar")
@@ -131,56 +153,53 @@
 			.attr("height", (d) => {return height - yScale(d.fatalities)})
 			.style("fill", "red")
 		
-		svg.append("g")
+		group.append("g")
 			.attr("class", "y_axis")
 			.call(yAxis);
 
-		svg.append("g")
+		group.append("g")
 			.attr("class", "x_axis")
 			.attr("transform", "translate(0," + height + ")")
 			.call(xAxis)
 			.selectAll("text")	
 			.style("text-anchor", "end")
 			.attr("dx", "-.8em")
-			.attr("dy", ".15em")
+			.attr("dy", AXIS_TEXT_DY)
 			.attr("transform", "rotate(-65)");
-		
-		var zoom = d3.zoom().on('zoom', () => {
-			let new_xScale = d3.event.transform.rescaleX(xScale);
-			console.log(xScale(50))
-			console.log(new_xScale)
-		});
 
 		/* VIEW CONVERSION FUNCTIONS */
 		let convertToDistributed = () => {
+			STATE = "distrubuted";
 			d3.selectAll(".blackbars")
 				.transition()
 				.duration(600)
 				.attr('x', (d, i) => {
 					return xDistributedScale(i + years_to_idx[d.year].idx * GROUP_SEPARATION_RATE);
 				})
-				.attr('width', 8)
+				.attr('width', 9)
 			d3.selectAll(".redbars")
 				.transition()
 				.duration(600)
 				.attr('x', (d, i) => {
 					return xDistributedScale(i + years_to_idx[d.year].idx * GROUP_SEPARATION_RATE);
 				})
-				.attr('width', 8)
+				.attr('width', 9)
 			
 			d3.select(".x_axis").call(xDistributedAxis)
 				.selectAll("text")	
 				.style("text-anchor", "end")
 				.attr("dx", "-.8em")
-				.attr("dy", ".15em")
+				.attr("dy", AXIS_TEXT_DY)
 				.attr("transform", "rotate(-65)");
 		}
 
 		let convertToYearly = () => {
+			STATE = "default";
+
 			d3.selectAll(".blackbars")
 				.transition()
 				.duration(600)
-				.attr('x', (d, i) => {return xTimeScale(parseTime(d.date))})
+				.attr('x', (d, i) => {return xTimeScale.domain(yearRange)(parseTime(d.date))})
 				.attr('width', 5)
 			d3.selectAll(".redbars")
 				.transition()
@@ -188,27 +207,27 @@
 				.attr('x', (d, i) => {return xTimeScale(parseTime(d.date))})
 				.attr('width', 5)
 
-			d3.select(".x_axis").call(xAxis)
+			d3.select(".x_axis").call(xAxis.scale(xTimeScale))
 				.selectAll("text")	
 				.style("text-anchor", "end")
 				.attr("dx", "-.8em")
-				.attr("dy", ".15em")
+				.attr("dy", AXIS_TEXT_DY)
 				.attr("transform", "rotate(-65)");
 		}
 
 		svg.append("rect")
 			.attr("x", 100)
 			.attr("y", 100)
-			.attr("width", 50)
-			.attr("height", 50)
+			.attr("width", 75)
+			.attr("height", 75)
 			.style("fill", "blue")
 			.on("click", convertToDistributed);
 
 		svg.append("rect")
-			.attr("x", 160)
+			.attr("x", 185)
 			.attr("y", 100)
-			.attr("width", 50)
-			.attr("height", 50)
+			.attr("width", 75)
+			.attr("height", 75)
 			.style("fill", "green")
 			.on("click", convertToYearly);
 	}
