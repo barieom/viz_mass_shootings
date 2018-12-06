@@ -234,9 +234,10 @@
 				.attr('y', (d, i) => {return newYscale(d.fatalities)})
 				.attr("height", (d) => {return height - newYscale(d.fatalities)})
 
-			d3.select(".y_axis").call(yAxis.scale(newYscale));
+			d3.select(".y_axis").transition().duration(600).call(yAxis.scale(newYscale));
 		}
 
+		/* BUTTONS */
 		svg.append("rect")
 			.attr("x", 100)
 			.attr("y", 100)
