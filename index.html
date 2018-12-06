@@ -48,9 +48,12 @@
 		return res
 	}
 
+	let csv_file = "/assets/data/mass_shootings.csv";
+	if (location.hostname != "localhost")
+		csv_file = "/viz_mass_shootings" + csv_file
 
 	d3.queue()
-	  .defer(d3.csv, "./assets/data/mass_shootings.csv")
+	  .defer(d3.csv, csv_file)
 	  .await(ready);
 
 	const MAX_DOMAIN = 100
