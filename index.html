@@ -51,6 +51,8 @@
 	let csv_file = "/assets/data/mass_shootings.csv";
 	if (location.hostname != "localhost")
 		csv_file = "/viz_mass_shootings" + csv_file
+	
+	console.log(csv_file)
 
 	d3.queue()
 	  .defer(d3.csv, csv_file)
