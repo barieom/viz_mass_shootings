@@ -59,13 +59,14 @@
 	function ready(error, data) {
 		if (error) { console.log(error); }
 		let STATE = "default";
+		let ACTUAL_MAX_DOMAIN = d3.max(data, d => { return Number(d.total_victims); })
 
 
 		let years_to_idx = getYearToIdx(data)
 		const numYears = Object.keys(years_to_idx).length
 		/* SCALES */
 		var yScale = d3.scaleLinear()
-		.domain([0, MAX_DOMAIN])// d3.max(data, d => { return Number(d.total_victims); })])
+		.domain([0, MAX_DOMAIN])// ])
 		.range([height, 0]);
 		
 		var parseTime = d3.timeParse("%m/%d/%Y"), parseYear = d3.timeParse("%Y");
@@ -215,6 +216,27 @@
 				.attr("transform", "rotate(-65)");
 		}
 
+		y_axis_cutoff = true;
+		let scaleYAxis = () => {
+			let domain = y_axis_cutoff? ACTUAL_MAX_DOMAIN: MAX_DOMAIN;
+			let newYscale = yScale.domain([0, domain]);
+			y_axis_cutoff = !y_axis_cutoff;
+
+			d3.selectAll(".blackbars")
+				.transition()
+				.duration(600)
+				.attr('y', (d, i) => {return newYscale(d.total_victims)})
+				.attr("height", (d) => {return height - newYscale(d.total_victims)})
+			
+			d3.selectAll(".redbars")
+				.transition()
+				.duration(600)
+				.attr('y', (d, i) => {return newYscale(d.fatalities)})
+				.attr("height", (d) => {return height - newYscale(d.fatalities)})
+
+			d3.select(".y_axis").call(yAxis.scale(newYscale));
+		}
+
 		svg.append("rect")
 			.attr("x", 100)
 			.attr("y", 100)
@@ -230,6 +252,14 @@
 			.attr("height", 75)
 			.style("fill", "green")
 			.on("click", convertToYearly);
+		
+		svg.append("rect")
+			.attr("x", 192)
+			.attr("y", 40)
+			.attr("width", 50)
+			.attr("height", 50)
+			.style("fill", "black")
+			.on("click", scaleYAxis);
 	}
 
 	function getYearlyVictims(data) {
