@@ -50,7 +50,7 @@
 
 
 	d3.queue()
-	  .defer(d3.csv, "/assets/data/mass_shootings.csv")
+	  .defer(d3.csv, "./assets/data/mass_shootings.csv")
 	  .await(ready);
 
 	const MAX_DOMAIN = 100
