@@ -58,7 +58,6 @@
 
 	let gun_type_classes = ['shand', 'srifle', 'hand', 'shot', 'rifle']
 	let parse_gun_type_class = (d) => {
-		console.log(d)
 		let gt_col = d.weapon_cat;
 		var ret = "";
 		gt_col.split(',').forEach(d => {
@@ -67,8 +66,10 @@
 		return ret;
 	}
 
+	let filename = location.hostname != "localhost"? "/viz_mass_shootings": "" + "/assets/data/mass_shootings.csv"
+	console.log(filename)
 	d3.queue()
-	  .defer(d3.csv, location.hostname != "localhost"? "/viz_mass_shootings": "" + "/assets/data/mass_shootings.csv")
+	  .defer(d3.csv, filename)
 	  .await(ready);
 
 	const MAX_DOMAIN = 100
@@ -76,6 +77,7 @@
 
 	function ready(error, data) {
 		if (error) { console.log(error); }
+		console.log(data);
 		let STATE = "default";
 		let ACTUAL_MAX_DOMAIN = d3.max(data, d => { return Number(d.total_victims); })
 
@@ -140,7 +142,6 @@
 
 		svg.call(zoom);
 		
-		console.log(data);
 		/* SVG APPENDAGES */
 		var groups = group.selectAll("g")
 			.data(data).enter()
