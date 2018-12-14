@@ -7,13 +7,25 @@
 	<style>
 		svg { font:10px sans-serif; }
 		rect { stroke: #fff; }
+		div.tooltip {	
+			position: absolute;			
+			text-align: center;			
+			width: 80px;					
+			height: 27px;					
+			padding: 2px;				
+			font: 12px sans-serif;		
+			background: lightsteelblue;	
+			border: 0px;		
+			border-radius: 8px;			
+			pointer-events: none;			
+		}
+		html {zoom: 80%;}
 	</style>
 </head>
 <body>
 	<!-- <svg id="barchart"></svg> -->
 
 	<script>
-
 	// set the dimensions and margins of the graph
 	var margin = {top: 20, right: 20, bottom: 80, left: 40},
 	    width = 1500 - margin.left - margin.right,
@@ -80,14 +92,11 @@
 		let STATE = "default";
 		let ACTUAL_MAX_DOMAIN = d3.max(data, d => { return Number(d.total_victims); })
 
-
 		let years_to_idx = getYearToIdx(data)
 		const numYears = Object.keys(years_to_idx).length
-		/* SCALES */
-		var yScale = d3.scaleLinear()
-		.domain([0, ACTUAL_MAX_DOMAIN])// ])
-		.range([height, 0]);
 		
+		/* SCALES */
+		var yScale = d3.scaleLinear().domain([0, ACTUAL_MAX_DOMAIN]).range([height, 0]);
 		var parseTime = d3.timeParse("%m/%d/%Y"), parseYear = d3.timeParse("%Y");
 		var yearRange = [parseYear("1982"), parseYear("2019")]
 		var xTimeScale = d3.scaleTime()
@@ -137,6 +146,10 @@
 			group.selectAll(".bars").transition()
 				.duration(20)
 				.attr("x", (d, i) => {let newx = new_xScale(parseTime(d.date)); return newx >= 0? newx <= width? newx: width+10000: -10000})
+			
+				group.selectAll(".hoverbars").transition()
+			.duration(20)
+			.attr("x", (d, i) => {let newx = new_xScale(parseTime(d.date)) - 2; return newx >= 0? newx <= width? newx: width+10000: -10000})
 		}
 
 		svg.call(zoom);
@@ -168,6 +181,62 @@
 			.attr("height", (d) => {return height - yScale(d.fatalities)})
 			.style("fill", "red")
 		
+
+		groups
+			.append("rect")
+			.attr("class", "hoverbars")
+			.attr("id", (d, i) => {return "hoverbars_" + i})
+			.attr("x", (d) => {return xTimeScale(parseTime(d.date)) - 2})
+			.attr("y", (d) => {return yScale(d.total_victims)})
+			.attr("width", 9)
+			.attr("height", (d) => {return height - yScale(d.total_victims)})
+			.style("fill", "rgb(0,0,0,0)")
+			.style("stroke", "none")
+			.attr("id", (d, i) => { return "hover_" + i})
+			.on("mouseover", function (d, i) {
+				console.log("mo")
+				d3.select(".tooltip").transition()
+					.duration(10)		
+					.style("opacity", .9);
+				d3.select(".tooltip").html("Fatalities: " + d.fatalities + "<br/>"  
+								+ "Injured: " + d.injured)	
+					.style("left", (d3.event.pageX)*1.25 + "px")		
+					.style("top", (d3.event.pageY - 28)*1.25 + "px");	
+			})
+			.on("mouseout", function (d, i) {
+				d3.select(".tooltip").transition()		
+					.duration(1000)		
+					.style("opacity", 0);	
+			})
+			.on("click", function (d, i) {
+				d3.selectAll(".hoverbars").style("stroke", "none");
+				d3.select("#hoverbars_" + i).style("stroke", "purple");
+				display(d)
+			});
+		
+		let description_text = svg.append("foreignObject")
+			.attr("x", 65)
+			.attr("y", 110)
+			.attr("width", 500)
+			.attr("height", 200)
+			.append("xhtml:body")
+			.style("font", "14px 'Helvetica Neue'")
+			.html("")
+
+
+		// let tooltip = svg.append("rect")
+		// 	.attr("x", 65)
+		// 	.attr("y", 120)
+		// 	.attr("width", 500)
+		// 	.attr("height", 200)
+		// 	.style("fill", "rgba(255, 255, 255, 0)")
+		// 	.style("stroke", "black")
+		// 	.style("stroke-width", "1")
+
+		let display = d => {
+			description_text.html("<h2>" + d.case + "</h2><h4>" + d.location + "</h4><p>" + d.summary + "</p>" )
+		}
+		
 		group.append("g")
 			.attr("class", "y_axis")
 			.call(yAxis);
@@ -181,6 +250,11 @@
 			.attr("dx", "-.8em")
 			.attr("dy", AXIS_TEXT_DY)
 			.attr("transform", "rotate(-65)");
+		
+		//tooltip
+		d3.select("body").append("div")	
+			.attr("class", "tooltip")				
+			.style("opacity", 1);
 
 		/* Highlight function */
 		let highlightFromButtons = (guntype_clicked, mhealth_clicked) => {
@@ -214,6 +288,9 @@
 				.attr('x', (d, i) => {
 					return xDistributedScale(i + years_to_idx[d.year].idx * GROUP_SEPARATION_RATE);
 				}).attr('width', 9)
+			d3.selectAll(".hoverbars").transition().duration(600)
+			.attr('x', (d, i) => {return xDistributedScale(i + years_to_idx[d.year].idx * GROUP_SEPARATION_RATE)})
+			.attr('width', 9)
 			
 			d3.select(".x_axis").call(xDistributedAxis).selectAll("text").style("text-anchor", "end")
 				.attr("dx", "-.8em").attr("dy", AXIS_TEXT_DY).attr("transform", "rotate(-65)");
@@ -227,6 +304,9 @@
 			d3.selectAll(".redbars").transition().duration(600)
 				.attr('x', (d, i) => {return xTimeScale(parseTime(d.date))})
 				.attr('width', 5)
+			d3.selectAll(".hoverbars").transition().duration(600)
+				.attr('x', (d, i) => {return xTimeScale(parseTime(d.date)) - 2})
+				.attr('width', 9)
 			d3.select(".x_axis").call(xAxis.scale(xTimeScale)).selectAll("text").style("text-anchor", "end")
 				.attr("dx", "-.8em").attr("dy", AXIS_TEXT_DY).attr("transform", "rotate(-65)");
 		}
@@ -250,20 +330,15 @@
 			d3.selectAll(".redbars").transition().duration(dur)
 				.attr('y', (d, i) => {return newYscale(d.fatalities)})
 				.attr("height", (d) => {return height - newYscale(d.fatalities)})
+			d3.selectAll(".hoverbars").transition().duration(dur)
+				.attr('y', (d, i) => {return newYscale(d.total_victims)})
+				.attr("height", (d) => {return height - newYscale(d.total_victims)})
 			d3.select(".y_axis").transition().duration(dur).call(yAxis.scale(newYscale));
 		}
 
 		button_data = {"mh": ['            Yes', '             No', '        Unknown'], 
 					   "guntype": ['Semi-auto handgun', '     Semi-auto rifle', '  Handgun/revolver', '          Shotgun', '             Rifle']}
 		/* BUTTONS */
-		let tooltip = svg.append("rect")
-			.attr("x", 65)
-			.attr("y", 130)
-			.attr("width", 500)
-			.attr("height", 200)
-			.style("fill", "rgba(255, 255, 255, .5)")
-			.style("stroke", "black")
-			.style("stroke-width", "1")
 
 		svg.append("rect") // Button Box
 			.attr("x", 65).attr("y", 15).attr("width", 1260).attr("height", 80)
