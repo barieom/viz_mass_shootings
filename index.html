@@ -48,14 +48,26 @@
 		return res
 	}
 
-	let csv_file = "/assets/data/mass_shootings.csv";
-	if (location.hostname != "localhost")
-		csv_file = "/viz_mass_shootings" + csv_file
-	
-	console.log(csv_file)
+	let mental_healths = ["m_health_prior", "m_health_none", "m_health_unknown"]
+	let parse_m_health_class = (d) => {
+		let m_health_col = d.prior_signs_mental_health_issues;
+		if (m_health_col == 'Yes') return "m_health_prior";
+		else if (m_health_col == 'No') return "m_health_none";
+		else return "m_health_unknown";
+	}
+
+	let gun_type_classes = ['shand', 'srifle', 'hand', 'shot', 'rifle']
+	let parse_gun_type_class = (d) => {
+		let gt_col = d.weapon_cat;
+		var ret = "";
+		gt_col.split(',').forEach(d => {
+			ret += gun_type_classes[d - 1] + " "
+		})
+		return ret;
+	}
 
 	d3.queue()
-	  .defer(d3.csv, csv_file)
+	  .defer(d3.csv, location.hostname != "localhost"? "/viz_mass_shootings": "" + "/assets/data/mass_shootings.csv")
 	  .await(ready);
 
 	const MAX_DOMAIN = 100
@@ -71,7 +83,7 @@
 		const numYears = Object.keys(years_to_idx).length
 		/* SCALES */
 		var yScale = d3.scaleLinear()
-		.domain([0, MAX_DOMAIN])// ])
+		.domain([0, ACTUAL_MAX_DOMAIN])// ])
 		.range([height, 0]);
 		
 		var parseTime = d3.timeParse("%m/%d/%Y"), parseYear = d3.timeParse("%Y");
@@ -107,11 +119,6 @@
 			.extent([[0, 0], [width, height]])
 			.on("zoom", zoomed);
 	
-		// function zoomed() {
-		// 	var t = d3.event.transform;
-		// 	xTimeScale.domain(t.rescaleX(xTimeScale).domain());
-		// 	d3.select(".x_axis").call(xAxis);
-		// }
 		function zoomed() {
 			if (STATE != "default") return;
 			let new_xScale = d3.event.transform.rescaleX(xTimeScale).range([0, width]);
@@ -125,7 +132,7 @@
 				.attr("dy", AXIS_TEXT_DY)
 				.attr("transform", "rotate(-65)");		
 			
-			group.selectAll("rect").transition()
+			group.selectAll(".bars").transition()
 				.duration(20)
 				.attr("x", (d, i) => {let newx = new_xScale(parseTime(d.date)); return newx >= 0? newx <= width? newx: width+10000: -10000})
 		}
@@ -141,17 +148,17 @@
 		
 		groups
 			.append("rect")
-			.attr("class", "blackbars")
+			.attr("class", d => {return "bars blackbars " + parse_m_health_class(d) + ' ' + parse_gun_type_class(d)})
 			.attr("id", (d, i) => {return "black_" + i})
 			.attr("x", (d, i) => {return xTimeScale(parseTime(d.date))})
 			.attr("y", (d) => {return yScale(d.total_victims)})
 			.attr("width", 5)
 			.attr("height", (d) => {return height - yScale(d.total_victims)})
 			.style("fill", "black")
-		
+				
 		groups
 			.append("rect")
-			.attr("class", "redbars")
+			.attr("class", d => {return "bars redbars " + parse_m_health_class(d) + ' ' + parse_gun_type_class(d)})
 			.attr("id", (d, i) => {return "red_" + i})
 			.attr("x", (d, i) => {return xTimeScale(parseTime(d.date))})
 			.attr("y", (d) => {return yScale(d.fatalities)})
@@ -172,6 +179,46 @@
 			.attr("dx", "-.8em")
 			.attr("dy", AXIS_TEXT_DY)
 			.attr("transform", "rotate(-65)");
+
+		/* Highlight functions */
+		let highlightMentalHealth = (type, is_visible) => {
+			d3.selectAll("." + type)
+			.transition()
+			.duration(500)
+			.style("opacity", () => {return is_visible? 1: .1})	
+		}
+
+		let highlightGunType = (visible_array) => {
+			d3.selectAll(".redbars").each((d, i) => {
+				let is_visible = false;
+				d.weapon_cat.split(',').forEach(idx => {
+					if (visible_array[idx-1]) {
+						is_visible = true;
+					}
+				})
+
+				d3.select('#red_' + i)
+				.transition()
+				.duration(500)
+				.style("opacity", () => {return is_visible? 1: .1})	
+				
+			});
+			
+			d3.selectAll(".blackbars").each((d, i) => {
+				let is_visible = false;
+				d.weapon_cat.split(',').forEach(idx => {
+					if (visible_array[idx-1]) {
+						is_visible = true;
+					}
+				})
+				d3.select('#black_' + i)
+				.transition()
+				.duration(500)
+				.style("opacity", () => {return is_visible? 1: .1})	
+				
+			})
+
+		}
 
 		/* VIEW CONVERSION FUNCTIONS */
 		let convertToDistributed = () => {
@@ -221,51 +268,236 @@
 				.attr("transform", "rotate(-65)");
 		}
 
-		y_axis_cutoff = true;
-		let scaleYAxis = () => {
+		let distributed = true;
+		let scaleXAxis = () => {
+			if (distributed) {
+				convertToYearly();
+			} else {
+				convertToDistributed();
+			}
+			distributed = !distributed;
+		}
+
+		let y_axis_cutoff = false;
+		let scaleYAxis = (dur) => {
+			if (!dur) dur = 600
 			let domain = y_axis_cutoff? ACTUAL_MAX_DOMAIN: MAX_DOMAIN;
 			let newYscale = yScale.domain([0, domain]);
 			y_axis_cutoff = !y_axis_cutoff;
 
 			d3.selectAll(".blackbars")
 				.transition()
-				.duration(600)
+				.duration(dur)
 				.attr('y', (d, i) => {return newYscale(d.total_victims)})
 				.attr("height", (d) => {return height - newYscale(d.total_victims)})
 			
 			d3.selectAll(".redbars")
 				.transition()
-				.duration(600)
+				.duration(dur)
 				.attr('y', (d, i) => {return newYscale(d.fatalities)})
 				.attr("height", (d) => {return height - newYscale(d.fatalities)})
 
-			d3.select(".y_axis").transition().duration(600).call(yAxis.scale(newYscale));
+			d3.select(".y_axis").transition().duration(dur).call(yAxis.scale(newYscale));
 		}
 
+		button_data = {"mh": ['     Yes', '      No', 'Unknown'], 
+					   "guntype": ['Semi-auto handgun', '     Semi-auto rifle', '  Handgun/revolver', '          Shotgun', '             Rifle']}
 		/* BUTTONS */
-		svg.append("rect")
-			.attr("x", 100)
-			.attr("y", 100)
-			.attr("width", 75)
-			.attr("height", 75)
-			.style("fill", "blue")
-			.on("click", convertToDistributed);
+		let tooltip = svg.append("rect")
+			.attr("x", 65)
+			.attr("y", 130)
+			.attr("width", 500)
+			.attr("height", 200)
+			.style("fill", "rgba(255, 255, 255, .5)")
+			.style("stroke", "black")
+			.style("stroke-width", "1")
 
 		svg.append("rect")
-			.attr("x", 185)
-			.attr("y", 100)
-			.attr("width", 75)
-			.attr("height", 75)
-			.style("fill", "green")
-			.on("click", convertToYearly);
+			.attr("x", 65)
+			.attr("y", 15)
+			.attr("width", 1200)
+			.attr("height", 80)
+			.style("fill", "rgba(255, 255, 255, .5)")
+			.style("stroke", "black")
+			.style("stroke-width", "2")
 		
-		svg.append("rect")
-			.attr("x", 192)
-			.attr("y", 40)
-			.attr("width", 50)
-			.attr("height", 50)
-			.style("fill", "black")
-			.on("click", scaleYAxis);
+		let mental_health_buttons = () => {
+			var nav = svg.append("svg")
+			var mg_groups = nav.selectAll("g")
+				.data(button_data.mh).enter()
+				.append("g")
+			
+			nav.append("text")
+				.attr("x", 70)
+				.attr("y", 35)
+				.style("font-size", "150%")
+				.text("Prior Signs of Mental Health Issues")
+			
+			let = mh_clicked = [true, true, true]
+			mg_groups.append("rect")
+				.attr("id", (d, i) => {return "box_" + i})
+				.attr("x", (d, i) => {return 95 + i*60})
+				.attr("y", 43)
+				.attr("width", 53)
+				.attr("height", 25)
+				.style("fill", "black")
+				.style("stroke", "black")
+				.style("stroke-width", "1")
+			
+			mg_groups.append("text")
+				.attr("id", (d, i) => {return "box_text_" + i})
+				.attr("x", (d, i) => {return 98 + i*60})
+				.attr("y", 60)
+				.text(d => {return d})
+				.style("fill", "white")
+				.style("white-space", "pre")
+				.style("font-size", "110%")
+			
+			mg_groups.append("rect")
+				.attr("x", (d, i) => {return 95 + i*60})
+				.attr("y", 43)
+				.attr("width", 53)
+				.attr("height", 25)
+				.style("fill", "rgba(0,0,0,0)")
+				.style("stroke", "none")
+				.on("click", function(d, i) {
+					mh_clicked[i] = !mh_clicked[i];
+					if (!mh_clicked[i]) {
+						//unselect
+						d3.select("#box_text_" + i)
+							.style("fill", "black");
+						d3.select("#box_" + i)
+							.style("fill", "white");
+						highlightMentalHealth(mental_healths[i], false)
+					} else {
+						//select
+						d3.select("#box_text_" + i)
+							.style("fill", "white");
+						d3.select("#box_" + i)
+							.style("fill", "black");
+						highlightMentalHealth(mental_healths[i], true)
+					}
+				})
+		}
+		mental_health_buttons();
+
+		let gun_type_buttons = () => {
+			var nav = svg.append("svg")
+			var mg_groups = nav.selectAll("g")
+				.data(button_data.guntype).enter()
+				.append("g")
+			
+			nav.append("text")
+				.attr("x", 590)
+				.attr("y", 35)
+				.style("font-size", "150%")
+				.text("Gun Type")
+			
+			let gun_clicked = [true, true, true, true, true]
+			mg_groups.append("rect")
+				.attr("id", (d, i) => {return "gun_box_" + i})
+				.attr("x", (d, i) => {return 350 + i*110})
+				.attr("y", 43)
+				.attr("width", 100)
+				.attr("height", 25)
+				.style("fill", "black")
+				.style("stroke", "black")
+				.style("stroke-width", "1")
+			
+			mg_groups.append("text")
+				.attr("id", (d, i) => {return "gun_box_text_" + i})
+				.attr("x", (d, i) => {return 350 + i*110})
+				.attr("y", 60)
+				.text(d => {return d})
+				.style("fill", "white")
+				.style("white-space", "pre")
+				.style("font-size", "110%")
+			
+			mg_groups.append("rect")
+				.attr("x", (d, i) => {return 350 + i*110})
+				.attr("y", 43)
+				.attr("width", 100)
+				.attr("height", 25)
+				.style("fill", "rgba(0,0,0,0)")
+				.style("stroke", "none")
+				.on("click", function(d, i) {
+					gun_clicked[i] = !gun_clicked[i];
+					if (!gun_clicked[i]) {
+						//unselect
+						d3.select("#gun_box_text_" + i)
+							.style("fill", "black");
+						d3.select("#gun_box_" + i)
+							.style("fill", "white");
+						highlightGunType(gun_clicked);
+					} else {
+						//select
+						d3.select("#gun_box_text_" + i)
+							.style("fill", "white");
+						d3.select("#gun_box_" + i)
+							.style("fill", "black");
+						highlightGunType(gun_clicked);
+					}
+				})
+		}
+		gun_type_buttons();
+
+		let axis_buttons = () => {
+			var nav = svg.append("svg")
+			var mg_groups = nav.selectAll("g")
+				.data(['X-axis', 'Y-axis']).enter()
+				.append("g")
+			
+			nav.append("text")
+				.attr("x", 1030)
+				.attr("y", 35)
+				.style("font-size", "150%")
+				.text("Toggle Axes")
+			
+			mg_groups.append("rect")
+				.attr("id", (d, i) => {return "axis_box_" + i})
+				.attr("x", (d, i) => {return 975 + i*110})
+				.attr("y", 43)
+				.attr("width", 100)
+				.attr("height", 25)
+				.style("fill", "black")
+				.style("stroke", "black")
+				.style("stroke-width", "1")
+			
+			mg_groups.append("text")
+				.attr("id", (d, i) => {return "axis_box_text_" + i})
+				.attr("x", (d, i) => {return 1010 + i*110})
+				.attr("y", 60)
+				.text(d => {return d})
+				.style("fill", "white")
+				.style("white-space", "pre")
+				.style("font-size", "110%")
+			
+			mg_groups.append("rect")
+				.attr("x", (d, i) => {return 975 + i*110})
+				.attr("y", 43)
+				.attr("width", 100)
+				.attr("height", 25)
+				.style("fill", "rgba(0,0,0,0)")
+				.style("stroke", "none")
+				.on("click", function(d, i) {
+					if (i == 0) {
+						scaleXAxis();
+						d3.select("#axis_box_text_" + i)
+							.style("fill", () => {return distributed? "black": "white"});
+						d3.select("#axis_box_" + i)
+							.style("fill", () => {return distributed? "white": "black"});
+					} else {
+						scaleYAxis();
+						d3.select("#axis_box_text_" + i)
+							.style("fill", () => {return !y_axis_cutoff? "black": "white"});
+						d3.select("#axis_box_" + i)
+							.style("fill", () => {return !y_axis_cutoff? "white": "black"});
+					}
+				})
+		}
+		axis_buttons();
+
+		scaleYAxis(4000)
 	}
 
 	function getYearlyVictims(data) {
