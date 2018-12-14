@@ -58,6 +58,7 @@
 
 	let gun_type_classes = ['shand', 'srifle', 'hand', 'shot', 'rifle']
 	let parse_gun_type_class = (d) => {
+		console.log(d)
 		let gt_col = d.weapon_cat;
 		var ret = "";
 		gt_col.split(',').forEach(d => {
