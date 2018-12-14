@@ -100,16 +100,20 @@
 			.append("rect")
 			.attr("x", (d) => {return xScale(parseTime(d.date))})
 			.attr("y", (d) => {return yScale(d.total_victims)})
+			.attr("id", (d, i) => { return "black_" + i})
 			.attr("width", 5)
 			.attr("height", (d) => {return height - yScale(d.total_victims)})
+			.attr("stroke", "none")
 			.style("fill", "black")
 		
 		groups
 			.append("rect")
 			.attr("x", (d) => {return xScale(parseTime(d.date))})
 			.attr("y", (d) => {return yScale(d.fatalities)})
+			.attr("id", (d, i) => { return "red_" + i})
 			.attr("width", 5)
 			.attr("height", (d) => {return height - yScale(d.fatalities)})
+			.attr("stroke", "none!important")
 			.style("fill", "red")
 
 		groups
@@ -119,16 +123,21 @@
 			.attr("width", 5)
 			.attr("height", (d) => {return height - yScale(d.total_victims)})
 			.style("fill", "none")
-			.on("mouseover", (d) => {
+			.attr("stroke", "none")
+			.attr("id", (d, i) => { return "hover_" + i})
+			.on("mouseover", function (d, i) {
+				enhanceBar(this, d, i);
 				casetooltip.transition()
-					.duration(1)		
+					.duration(10)		
                 	.style("opacity", .9);
                 casetooltip.html("Fatalities: " + d.fatalities + "<br/>"  
                 				+ "Injured: " + d.injured)	
                 	.style("left", (d3.event.pageX) + "px")		
                 	.style("top", (d3.event.pageY - 28) + "px");	
 			})
-			.on("mouseout", (d) => {
+			.on("mouseout", function (d, i) {
+				reduceBar(this, d, i);
+
 				casetooltip.transition()		
 	                .duration(1000)		
 	                .style("opacity", 0);	
@@ -143,6 +152,43 @@
 			.attr("transform", "translate(0," + height + ")")
 			.call(xAxis);
 
+	}
+
+	function enhanceBar(obj, d, i) {
+		var xPos = +d3.select(obj).attr("x");
+        var wid = +d3.select(obj).attr("width");
+        d3.select(obj)
+        	.attr("x", xPos - 20)
+        	.attr("width", wid + 40);
+
+        d3.select("[id='black_" + i + "']")
+        	.attr("x", function(d) { 
+        		console.log("ay")
+        		return xPos - 5})
+        	.attr("width", wid + 10);
+
+        d3.selectAll("[id='red_" + i + "']")
+        	.attr("x", xPos - 5)
+        	.attr("width", wid + 10);
+	}
+
+	function reduceBar(obj, d, i) {
+		var xPos = +d3.select(obj).attr("x");
+        var wid = +d3.select(obj).attr("width");
+        console.log(xPos)
+
+        d3.select("[id='black_" + i + "']")
+        	.attr("x", function(d) {
+        		return xPos + 20})
+        	.attr("width", wid - 40)
+
+        d3.selectAll("[id='red_" + i + "']")
+        	.attr("x", xPos + 20)
+        	.attr("width", wid - 40);
+
+    	d3.select(obj)
+	    	.attr("x", xPos + 20)
+	    	.attr("width", wid - 40);
 	}
 
 	function getYearlyVictims(data) {
