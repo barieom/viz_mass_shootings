@@ -66,10 +66,11 @@
 		return ret;
 	}
 
-	let filename = (location.hostname != "localhost"? "/viz_mass_shootings": "") + "/assets/data/mass_shootings.csv"
-	console.log(filename)
+	let filename_prefix = (location.hostname != "localhost"? "/viz_mass_shootings": "")
+	const full_filename = filename_prefix + "/assets/data/mass_shootings.csv"
+	console.log(full_filename)
 	d3.queue()
-	  .defer(d3.csv, filename)
+	  .defer(d3.csv, full_filename)
 	  .await(ready);
 
 	const MAX_DOMAIN = 100
