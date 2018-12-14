@@ -152,9 +152,9 @@
 			.attr("class", d => {return "bars blackbars " + parse_m_health_class(d)})
 			.attr("id", (d, i) => {return "black_" + i})
 			.attr("x", (d, i) => {return xTimeScale(parseTime(d.date))})
-			.attr("y", (d) => {console.log(d); console.log(d.total_victims); yScale(d.total_victims)})
+			.attr("y", (d) => {return yScale(d.total_victims)})
 			.attr("width", 5)
-			.attr("height", (d) => {return height - yScale(d.total_victims)})
+			.attr("height", (d) => {console.log(d); console.log(d.total_victims); return height - yScale(d.total_victims)})
 			.style("fill", "black")
 				
 		groups
