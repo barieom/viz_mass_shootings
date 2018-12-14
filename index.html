@@ -149,7 +149,7 @@
 		
 		groups
 			.append("rect")
-			.attr("class", d => {return "bars blackbars " + parse_m_health_class(d) + ' ' + parse_gun_type_class(d)})
+			.attr("class", d => {return "bars blackbars " + parse_m_health_class(d)})
 			.attr("id", (d, i) => {return "black_" + i})
 			.attr("x", (d, i) => {return xTimeScale(parseTime(d.date))})
 			.attr("y", (d) => {return yScale(d.total_victims)})
@@ -159,7 +159,7 @@
 				
 		groups
 			.append("rect")
-			.attr("class", d => {return "bars redbars " + parse_m_health_class(d) + ' ' + parse_gun_type_class(d)})
+			.attr("class", d => {return "bars redbars " + parse_m_health_class(d)})
 			.attr("id", (d, i) => {return "red_" + i})
 			.attr("x", (d, i) => {return xTimeScale(parseTime(d.date))})
 			.attr("y", (d) => {return yScale(d.fatalities)})
