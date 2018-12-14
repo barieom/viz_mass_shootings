@@ -66,7 +66,7 @@
 		return ret;
 	}
 
-	let filename = location.hostname != "localhost"? "/viz_mass_shootings": "" + "/assets/data/mass_shootings.csv"
+	let filename = (location.hostname != "localhost"? "/viz_mass_shootings": "") + "/assets/data/mass_shootings.csv"
 	console.log(filename)
 	d3.queue()
 	  .defer(d3.csv, filename)
